@@ -33,6 +33,9 @@ CXXFLAGS := $(CXXFLAGS) -I$(LIB_DIR) -I$(EIGEN) -I./ $(DEBUGGING) -fPIC
 EigenHelloWorld: 01-EigenHelloWorld.o $(COMMONUTIL_O)
 	$(CXX) -std=$(CXX_STANDATD) 01-EigenHelloWorld.o $(COMMONUTIL_O) $(LDFLAGS) $(DEBUGGING) -o 01-EigenHelloWorld.exe $(LDFALGS)
 
+Mat_and_Vec: 02-Mat_and_Vec.o $(COMMONUTIL_O)
+	$(CXX) -std=$(CXX_STANDATD) 02-Mat_and_Vec.o $(COMMONUTIL_O) $(LDFLAGS) $(DEBUGGING) -o 02-Mat_and_Vec.exe $(LDFALGS)
+
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
