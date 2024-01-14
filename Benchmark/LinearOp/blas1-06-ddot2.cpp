@@ -34,14 +34,6 @@ int main(int argc, const char **argv)
 {
     /// define the size of the problem
 
-    // uint64_t TASK[]{4, 8, 16, 32, 64, 128, 256, 512,
-    //                 1 * KB, 2 * KB, 4 * KB, 8 * KB, 16 * KB, 32 * KB,
-    //                 64 * KB,
-    //                 128 * KB,
-    //                 256 * KB,
-    //                 512 * KB,
-    //                 1 * MB,
-    //                 2 * MB, 4 * MB, 8 * MB, 16 * MB, 32 * MB};
     uint64_t TASK[]{4, 8, 16, 32,
                     64, 128, 256, 512,
                     1ULL << 10,
@@ -62,51 +54,64 @@ int main(int argc, const char **argv)
                     1ULL << 25};
     const int nTASK = sizeof(TASK) / sizeof(uint64_t);
 
+    const size_t LENGTH_VEC = 1ULL << 25;
+    std::vector<double> VecA = GenerateRandomDoubleVector(LENGTH_VEC);
+    std::vector<double> VecB = GenerateRandomDoubleVector(LENGTH_VEC);
+    const int NLOOP = 32;
+    const double FLOP_TOT = 2 * double(LENGTH_VEC) * NLOOP / OneGOperation;
+
     /* (2) plain loop */
 
     for (int i = 0; i < nTASK; ++i)
     {
-        auto TestTime = _get_loop_time(TASK[i]);
-        std::vector<double> VecA = GenerateRandomDoubleVector(TASK[i]);
-        std::vector<double> VecB = GenerateRandomDoubleVector(TASK[i]);
+        auto nInnerLoop = LENGTH_VEC / TASK[i];
 
         /////// RUN the Test
 
         auto time_begin_wall = std::chrono::system_clock::now();
         auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
-        for (int j = 0; j < TestTime; ++j)
+        for (int j = 0; j < NLOOP; ++j)
         {
-            auto res = vector_ddot_loop(VecA.data(), VecB.data(), TASK[i]);
+            for (int k = 0; k < nInnerLoop; ++k)
+            {
+                auto res = vector_ddot_loop(VecA.data() + k * TASK[i], VecB.data() + k * TASK[i], TASK[i]);
+            }
         }
         auto time_end_wall = std::chrono::system_clock::now();
         auto time_end_cpu = boost::chrono::process_cpu_clock::now();
         double duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall);
         double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu);
 
-        printf("vector_add_contant_loop with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", TASK[i], duration_wall,
-               duration_cpu, _get_GFLO(TASK[i], TestTime) * 1000 / duration_wall);
+        printf("vector_ddot_loop with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", TASK[i], duration_wall,
+               duration_cpu, FLOP_TOT * 1000 / duration_wall);
     }
 
     /* (3) eigen with fix size */
 
     /// size 4
 
-    auto TestTime = _get_loop_time(FIX_SIZE);
-    std::vector<double> VecA = GenerateRandomDoubleVector(FIX_SIZE);
-    std::vector<double> VecB = GenerateRandomDoubleVector(FIX_SIZE);
+    static const int FIX_SIZE_EIGEN = 4;
 
-    Eigen::Map<Eigen::Vector4d> A(VecA.data());
-    Eigen::Map<Eigen::Vector4d> B(VecB.data());
+    auto nInnerLoop = LENGTH_VEC / FIX_SIZE_EIGEN;
+    // std::vector<double> VecA = GenerateRandomDoubleVector(FIX_SIZE);
+    // std::vector<double> VecB = GenerateRandomDoubleVector(FIX_SIZE);
+
+    // Eigen::Map<Eigen::Vector4d> A(VecA.data());
+    // Eigen::Map<Eigen::Vector4d> B(VecB.data());
 
     /////// RUN the Test
 
     auto time_begin_wall = std::chrono::system_clock::now();
     auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
-    printf("test_time = %d\n", TestTime);
     double res = 0.0;
-    for (int j = 0; j < TestTime; ++j)
+    for (int j = 0; j < NLOOP; ++j)
     {
-        res += A.adjoint() * B;
+        for (int k = 0; k < nInnerLoop; ++k)
+        {
+            Eigen::Map<Eigen::Vector4d> A(VecA.data() + k * FIX_SIZE_EIGEN);
+            Eigen::Map<Eigen::Vector4d> B(VecB.data() + k * FIX_SIZE_EIGEN);
+            res = A.adjoint() * B;
+        }
     }
     printf("res = %f\n", res);
     auto time_end_wall = std::chrono::system_clock::now();
@@ -115,20 +120,19 @@ int main(int argc, const char **argv)
     double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu);
 
     printf("vector_ddot_Eigen_FixedSize with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", 4, duration_wall,
-           duration_cpu, _get_GFLO(4, TestTime) * 1000 / duration_wall);
+           duration_cpu, FLOP_TOT * 1000 / duration_wall);
 
     /* ------------------------- UNROLL ------------------------- */
 
-    std::vector<double> VecAA = GenerateRandomDoubleVector(FIX_SIZE);
-    double *headAA = VecAA.data();
-
     time_begin_wall = std::chrono::system_clock::now();
     time_begin_cpu = boost::chrono::process_cpu_clock::now();
-    printf("TestTime=%d\n", TestTime);
     res = 0.0;
-    for (int j = 0; j < TestTime; ++j)
+    for (int j = 0; j < NLOOP; ++j)
     {
-        res += math_automatic_unroll<double, 4>::ddot(VecAA.data(), VecB.data());
+        for (int k = 0; k < nInnerLoop; ++k)
+        {
+            res += math_automatic_unroll<double, 4>::ddot(VecA.data() + k * FIX_SIZE_EIGEN, VecB.data() + k * FIX_SIZE_EIGEN);
+        }
     }
     printf("res = %f\n", res);
     time_end_wall = std::chrono::system_clock::now();
@@ -137,7 +141,7 @@ int main(int argc, const char **argv)
     duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu);
 
     printf("vector_ddot_unroll with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", 4, duration_wall,
-           duration_cpu, _get_GFLO(4, TestTime) * 1000 / duration_wall);
+           duration_cpu, FLOP_TOT * 1000 / duration_wall);
 
     /// EigenMap
 
@@ -145,21 +149,21 @@ int main(int argc, const char **argv)
 
     for (int i = 0; i < nTASK; ++i)
     {
-        auto TestTime = _get_loop_time(TASK[i]);
-        std::vector<double> VecA = GenerateRandomDoubleVector(TASK[i]);
-        std::vector<double> VecB = GenerateRandomDoubleVector(TASK[i]);
+        auto nInnerLoop = LENGTH_VEC / TASK[i];
 
         /////// RUN the Test
-
-        Eigen::Map<Eigen::VectorXd> A(VecA.data(), TASK[i]);
-        Eigen::Map<Eigen::VectorXd> B(VecB.data(), TASK[i]);
 
         auto time_begin_wall = std::chrono::system_clock::now();
         auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
         double res = 0.0;
-        for (int j = 0; j < TestTime; ++j)
+        for (int j = 0; j < NLOOP; ++j)
         {
-            res += A.adjoint() * B;
+            for (int k = 0; k < nInnerLoop; ++k)
+            {
+                Eigen::Map<Eigen::VectorXd> A(VecA.data() + k * TASK[i], TASK[i]);
+                Eigen::Map<Eigen::VectorXd> B(VecB.data() + k * TASK[i], TASK[i]);
+                res += A.adjoint() * B;
+            }
         }
         res_eigen += res;
         auto time_end_wall = std::chrono::system_clock::now();
@@ -168,7 +172,7 @@ int main(int argc, const char **argv)
         double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu);
 
         printf("vector_ddot_Eigen with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", TASK[i], duration_wall,
-               duration_cpu, _get_GFLO(TASK[i], TestTime) * 1000 / duration_wall);
+               duration_cpu, FLOP_TOT * 1000 / duration_wall);
     }
 
     printf("res_eigen = %f\n", res_eigen);
@@ -177,17 +181,18 @@ int main(int argc, const char **argv)
 
     for (int i = 0; i < nTASK; ++i)
     {
-        auto TestTime = _get_loop_time(TASK[i]);
-        std::vector<double> VecA = GenerateRandomDoubleVector(TASK[i]);
-        std::vector<double> VecB = GenerateRandomDoubleVector(TASK[i]);
+        auto nInnerLoop = LENGTH_VEC / TASK[i];
 
         /////// RUN the Test
 
         auto time_begin_wall = std::chrono::system_clock::now();
         auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
-        for (int j = 0; j < TestTime; ++j)
+        for (int j = 0; j < NLOOP; ++j)
         {
-            auto res = ispc::vector_dot((double *)VecA.data(), (double *)VecB.data(), TASK[i]);
+            for (int k = 0; k < nInnerLoop; ++k)
+            {
+                auto res = ispc::vector_dot((double *)VecA.data() + k * TASK[i], (double *)VecB.data() + k * TASK[i], TASK[i]);
+            }
         }
         auto time_end_wall = std::chrono::system_clock::now();
         auto time_end_cpu = boost::chrono::process_cpu_clock::now();
@@ -195,24 +200,25 @@ int main(int argc, const char **argv)
         double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu);
 
         printf("vector_ddot_ispc with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", TASK[i], duration_wall,
-               duration_cpu, _get_GFLO(TASK[i], TestTime) * 1000 / duration_wall);
+               duration_cpu, FLOP_TOT * 1000 / duration_wall);
     }
 
     /// MKL
 
     for (int i = 0; i < nTASK; ++i)
     {
-        auto TestTime = _get_loop_time(TASK[i]);
-        std::vector<double> VecA = GenerateRandomDoubleVector(TASK[i]);
-        std::vector<double> VecB = GenerateRandomDoubleVector(TASK[i]);
+        auto nInnerLoop = LENGTH_VEC / TASK[i];
 
         /////// RUN the Test
 
         auto time_begin_wall = std::chrono::system_clock::now();
         auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
-        for (int j = 0; j < TestTime; ++j)
+        for (int j = 0; j < NLOOP; ++j)
         {
-            auto res = MathUtil::DOT(TASK[i], VecA.data(), 1, VecB.data(), 1);
+            for (int k = 0; k < nInnerLoop; ++k)
+            {
+                auto res = MathUtil::DOT(TASK[i], VecA.data() + k * TASK[i], 1, VecB.data() + k * TASK[i], 1);
+            }
         }
         auto time_end_wall = std::chrono::system_clock::now();
         auto time_end_cpu = boost::chrono::process_cpu_clock::now();
@@ -220,6 +226,6 @@ int main(int argc, const char **argv)
         double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu);
 
         printf("vector_ddot_MKL with size %10d wall time %12.3f ms cputime %12.3f FLOPS %12.3f \n", TASK[i], duration_wall,
-               duration_cpu, _get_GFLO(TASK[i], TestTime) * 1000 / duration_wall);
+               duration_cpu, FLOP_TOT * 1000 / duration_wall);
     }
 }

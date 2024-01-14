@@ -32,6 +32,8 @@ CXXFLAGS := $(CXXFLAGS) -I$(LIB_DIR) -I$(EIGEN) -I./ $(DEBUGGING) -fPIC
 
 ISPC_O := ../../utils/MathUtilISPC.o
 
+all: blas1daxpy blas1zaxpy blas1daxpc blas1ddot blas1zdot blas1ddot2
+
 blas1daxpy: blas1-01-daxpy.o $(COMMONUTIL_O)
 	$(CXX) -std=$(CXX_STANDATD) blas1-01-daxpy.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o blas1-01-daxpy.exe $(LDFALGS)
 
@@ -44,8 +46,12 @@ blas1daxpc: blas1-03-daxpc.o $(COMMONUTIL_O)
 blas1ddot: blas1-04-ddot.o $(COMMONUTIL_O)
 	$(CXX) -std=$(CXX_STANDATD) blas1-04-ddot.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o blas1-04-ddot.exe $(LDFALGS)
 
+blas1ddot2: blas1-06-ddot2.o $(COMMONUTIL_O)
+	$(CXX) -std=$(CXX_STANDATD) blas1-06-ddot2.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o blas1-06-ddot2.exe $(LDFALGS)
+
 blas1zdot: blas1-05-zdot.o $(COMMONUTIL_O)
 	$(CXX) -std=$(CXX_STANDATD) blas1-05-zdot.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o blas1-05-zdot.exe $(LDFALGS)
+
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
