@@ -2,7 +2,7 @@
  * @Author: Ning Zhang
  * @Date: 2024-01-12 20:54:47
  * @Last Modified by: Ning Zhang
- * @Last Modified time: 2024-01-12 20:59:20
+ * @Last Modified time: 2024-01-13 17:51:32
  */
 
 #ifndef CONFIG_H
@@ -44,7 +44,6 @@
 #include <regex>
 #include <stdexcept>
 #include <complex>
-#include <chrono>
 #include <map>
 #include <type_traits>
 #include <memory>
@@ -55,7 +54,19 @@
 #define OMP_NUM_OF_THREADS std::atoi(getenv("OMP_NUM_THREADS"))
 #define OMP_THREAD_LABEL omp_get_thread_num()
 
+/* constant */
+
+static const unsigned long long KB = 1000ULL;
+static const unsigned long long MB = 1000000ULL;
+static const unsigned long long GB = 1000000000ULL;
+static const unsigned long long TB = 1000000000000ULL;
+
 /* math lib */
+
+#define iCI_complex_double std::complex<double>
+#define iCI_complex_float std::complex<float>
+#define USE_ISPC
+
 
 #ifdef _MKL_
 #include <mkl.h>
@@ -128,5 +139,26 @@ inline void cblas_dsctr(const MKL_INT N, const double *X, const MKL_INT *indx,
 }
 
 #endif
+
+/// 计时
+
+#include <boost/chrono/process_cpu_clocks.hpp>
+#include <boost/chrono.hpp>
+#include <chrono>
+
+using chrono_time_t = decltype(std::chrono::system_clock::now());
+using boost_chrono_time_t = decltype(boost::chrono::process_cpu_clock::now());
+
+inline double get_duration_in_ms(chrono_time_t start, chrono_time_t end)
+{
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    return double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den * 1000;
+}
+
+inline double get_duration_in_ms(boost_chrono_time_t start, boost_chrono_time_t end)
+{
+    auto duration = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start);
+    return double(duration.count()) * boost::chrono::microseconds::period::num / boost::chrono::microseconds::period::den * 1000;
+}
 
 #endif // CONFIG_H

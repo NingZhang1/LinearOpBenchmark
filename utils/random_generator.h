@@ -34,6 +34,17 @@ inline std::vector<double> GenerateRandomDoubleVector(const int _nelmt)
     return Res;
 }
 
+inline std::vector<std::complex<double>> GenerateRandomComplexDoubleVector(const int _nelmt)
+{
+    srand(time(NULL));
+    std::vector<std::complex<double>> Res;
+    for (int i = 0; i < _nelmt; ++i)
+    {
+        Res.push_back(GenerateRandomNumber<std::complex<double>>(0.0));
+    }
+    return Res;
+}
+
 inline std::vector<double> GenerateRandomMatrix(const int _ndim)
 {
     return GenerateRandomDoubleVector(_ndim * _ndim);
