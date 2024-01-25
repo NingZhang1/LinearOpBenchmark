@@ -261,6 +261,33 @@ namespace MathUtil
         }
     }
 
+    inline void CSRMV(const int nState, const MKL_INT *m, const MKL_INT *k, const double *val, const MKL_INT *indx, const MKL_INT *pntrb, const MKL_INT *pntre, const double *x, double *y)
+    {
+        if (nState < 8)
+        {
+            for (auto irow = 0; irow < *m; ++irow)
+            {
+                for (auto icol = pntrb[irow]; icol < pntre[irow]; ++icol)
+                {
+                    for (int istate = 0; istate < nState; ++istate)
+                    {
+                        y[irow * nState + istate] += val[icol] * x[indx[icol] * nState + istate];
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (auto irow = 0; irow < *m; ++irow)
+            {
+                for (auto icol = pntrb[irow]; icol < pntre[irow]; ++icol)
+                {
+                    ispc::vector_daxpy(y + irow * nState, val[icol], x + indx[icol] * nState, nState);
+                }
+            }
+        }
+    }
+
     /// real ccf and complex integrals
 
     /* ----- BLAS 3 ----- */

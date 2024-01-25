@@ -61,5 +61,23 @@ int main()
               << R3 << std::endl;
 
     std::cout << "R1^-1 * R1 =" << std::endl
-                << R3 * R1 << std::endl;
+              << R3 * R1 << std::endl;
+
+    std::cout << "m =" << std::endl
+              << m << std::endl;
+
+    /// check whether the memory address is chagned
+
+    std::cout << "m.data()  = " << m.data() << std::endl;
+    std::cout << "Q.data()  = " << Q.data() << std::endl;
+    std::cout << "R.data()  = " << R.data() << std::endl;
+    std::cout << "R1.data() = " << R1.data() << std::endl;
+    std::cout << "R2.data() = " << R2.data() << std::endl;
+    std::cout << "R3.data() = " << R3.data() << std::endl;
+
+    std::cout << "block R ^{-1} * R * P^{-1}" << std::endl
+              << R1.triangularView<Eigen::Upper>().solve(R2) * P.inverse() << std::endl;
+
+    std::cout << "should equal to" << std::endl
+              << R3 * R2 * P.inverse() << std::endl;
 }

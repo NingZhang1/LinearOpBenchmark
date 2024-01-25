@@ -40,3 +40,36 @@ export uniform double vector_dot (const uniform double a[],
     return reduce_add(sum);
 }
 
+export void AccumulateEptStateMajor(
+    const uniform double sigma[],
+    const uniform double dg[],
+    const uniform double eiCI[],
+    const uniform int ncsf,
+    const uniform int nstates,
+    uniform double out[])
+{
+    for(uniform int istate=0;istate<nstates;++istate)
+    { 
+        varying double restmp=0.0;
+        const double uniform eiCI_now = eiCI[istate]; 
+        const double * uniform PTR_UNIFORM = sigma + istate*ncsf;
+        foreach(icsf=0...ncsf)
+        {
+            restmp+=PTR_UNIFORM[icsf]*PTR_UNIFORM[icsf]/(eiCI_now-dg[icsf]);
+        }
+        out[istate]+=reduce_add(restmp);
+    }
+}
+
+export void AccumulateEptCSFMajorKernel(
+    const uniform double sigma[],
+    const uniform double dg,
+    const uniform double eiCI[],
+    const uniform int nstates,
+    uniform double out[])
+{
+    foreach(istate=0...nstates)
+    { 
+        out[istate] += sigma[istate]*sigma[istate]/(eiCI[istate]-dg);
+    }
+}

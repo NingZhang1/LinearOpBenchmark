@@ -32,6 +32,8 @@ namespace ispc { /* namespace */
 #if defined(__cplusplus) && (! defined(__ISPC_NO_EXTERN_C) || !__ISPC_NO_EXTERN_C )
 extern "C" {
 #endif // __cplusplus
+    extern void AccumulateEptCSFMajorKernel(const double * sigma, const double dg, const double * eiCI, const int32_t nstates, double * out);
+    extern void AccumulateEptStateMajor(const double * sigma, const double * dg, const double * eiCI, const int32_t ncsf, const int32_t nstates, double * out);
     extern void vector_add_constant(double * a, const double b, const int32_t size);
     extern void vector_daxpy(double * a, const double alpha, const double * b, const int32_t size);
     extern double vector_dot(const double * a, const double * b, const int32_t size);

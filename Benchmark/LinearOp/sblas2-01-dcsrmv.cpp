@@ -37,22 +37,25 @@ struct Statistic
         int _nRow,
         int _nCol,
         int _nNnz,
+        int _nState,
         int _test_time,
         double _Eigen_time,
         double _MKL_time)
         : nRow(_nRow),
           nCol(_nCol),
           nNnz(_nNnz),
+          nState(_nState),
           test_time(_test_time),
           Eigen_time(_Eigen_time),
           MKL_time(_MKL_time)
     {
-        flops = _nNnz * 2.0 * _test_time;
+        flops = _nNnz * 2.0 * _test_time * _nState;
     }
 
     int nRow;
     int nCol;
     int nNnz;
+    int nState;
     int test_time;
     double Eigen_time;
     double MKL_time;
@@ -66,100 +69,269 @@ int main(int argc, const char **argv)
     /// define the size of the problem
 
     uint64_t TASK[]{
+        1ULL << 8,
+        1ULL << 10,
         1ULL << 14,
         1ULL << 15,
-        1ULL << 16,
-        1ULL << 17,
-        1ULL << 18,
-        1ULL << 19,
-        1ULL << 20
+        // 1ULL << 16,
+        // 1ULL << 17,
+        // 1ULL << 18,
+        // 1ULL << 19,
+        // 1ULL << 20
     };
 
     double DENSITY[]{
-        1e-4, 3e-4, 1e-3, 3e-3};
+        // 1e-4,
+        3e-4, 1e-3, 3e-3};
+
+    int NSTATE[]{1, 2, 4, 8, 16};
 
     const int nTASK = sizeof(TASK) / sizeof(uint64_t);
     const int nDENSITY = sizeof(DENSITY) / sizeof(double);
+    const int nSTATE = sizeof(NSTATE) / sizeof(int);
 
-    ////
+    //// TODO: test multi-vectors!
 
     std::vector<Statistic> Stat;
 
-    for (int row_id = 0; row_id < nTASK; row_id++)
+    for (int state_id = 0; state_id < nSTATE; ++state_id)
     {
-        for (int col_id = 0; col_id < nTASK; col_id++)
+        printf(" ************** state = %d ************** \n", NSTATE[state_id]);
+        Stat.clear();
+        auto nstate = NSTATE[state_id];
+        for (int row_id = 0; row_id < nTASK; row_id++)
         {
-            for (int density_id = 0; density_id < nDENSITY; density_id++)
+            for (int col_id = 0; col_id < nTASK; col_id++)
             {
-                /// generate test data
-
-                MKL_INT nRow = TASK[row_id];
-                MKL_INT nCol = TASK[col_id];
-                double density = DENSITY[density_id];
-
-                SparseMat_t mat = getSparseMat(nRow, nCol, density);
-
-                Eigen::VectorXd vec = Eigen::VectorXd::Random(nCol);
-                Eigen::VectorXd res = Eigen::VectorXd::Zero(nRow);
-
-                /// get the raw ptr to call mkl
-
-                auto *RowIndx = mat.outerIndexPtr();
-                auto *ColIndx = mat.innerIndexPtr();
-                auto *Value = mat.valuePtr();
-                auto nnz = mat.nonZeros();
-                auto nFLOPS = nnz * 2.0;
-                int testtime = (double)OneGOperation / (nFLOPS * FACTOR);
-
-                if (testtime < 8)
+                for (int density_id = 0; density_id < nDENSITY; density_id++)
                 {
-                    continue;
+
+                    /// generate test data
+
+                    MKL_INT nRow = TASK[row_id];
+                    MKL_INT nCol = TASK[col_id];
+                    double density = DENSITY[density_id];
+
+                    SparseMat_t mat = getSparseMat(nRow, nCol, density);
+
+                    if (nstate == 1)
+                    {
+                        Eigen::VectorXd vec = Eigen::VectorXd::Random(nCol);
+                        Eigen::VectorXd res = Eigen::VectorXd::Zero(nRow);
+
+                        /// get the raw ptr to call mkl
+
+                        auto *RowIndx = mat.outerIndexPtr();
+                        auto *ColIndx = mat.innerIndexPtr();
+                        auto *Value = mat.valuePtr();
+                        auto nnz = mat.nonZeros();
+                        auto nFLOPS = nnz * 2.0;
+                        int testtime = (double)OneGOperation / (nFLOPS * FACTOR * nstate);
+
+                        if (testtime < 8)
+                        {
+                            continue;
+                        }
+
+                        /// run the test
+
+                        auto time_begin_wall = std::chrono::system_clock::now();
+                        auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
+
+                        for (int i = 0; i < testtime; ++i)
+                        {
+                            MathUtil::CSRMV(&nRow, &nCol, Value, ColIndx, RowIndx, RowIndx + 1, vec.data(), res.data());
+                        }
+
+                        auto time_end_wall = std::chrono::system_clock::now();
+                        auto time_end_cpu = boost::chrono::process_cpu_clock::now();
+                        double duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
+                        double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
+
+                        double duration_mkl = duration_wall;
+
+                        time_begin_wall = std::chrono::system_clock::now();
+                        time_begin_cpu = boost::chrono::process_cpu_clock::now();
+
+                        for (int i = 0; i < testtime; ++i)
+                        {
+                            res += mat * vec;
+                        }
+
+                        time_end_wall = std::chrono::system_clock::now();
+                        time_end_cpu = boost::chrono::process_cpu_clock::now();
+                        duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
+                        duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
+
+                        double duration_eigen = duration_wall;
+
+                        Stat.push_back(Statistic(nRow, nCol, nnz, nstate, testtime, duration_eigen, duration_mkl));
+
+                        std::cout << "nRow = " << nRow << " nCol = " << nCol << " nnz = " << nnz << " nstate = " << nstate << " testtime = " << testtime << std::endl;
+                    }
+                    else
+                    {
+                        Eigen::MatrixXd vec = Eigen::MatrixXd::Random(nCol, nstate);
+                        Eigen::MatrixXd res = Eigen::MatrixXd::Zero(nRow, nstate);
+
+                        /// get the raw ptr to call mkl
+
+                        auto *RowIndx = mat.outerIndexPtr();
+                        auto *ColIndx = mat.innerIndexPtr();
+                        auto *Value = mat.valuePtr();
+                        auto nnz = mat.nonZeros();
+                        auto nFLOPS = nnz * 2.0;
+                        int testtime = (double)OneGOperation / (nFLOPS * FACTOR * nstate);
+
+                        if (testtime < 8)
+                        {
+                            continue;
+                        }
+
+                        /// run the test
+
+                        auto time_begin_wall = std::chrono::system_clock::now();
+                        auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
+
+                        for (int i = 0; i < testtime; ++i)
+                        {
+                            for (int j = 0; j < nstate; ++j)
+                            {
+                                MathUtil::CSRMV(&nRow, &nCol, Value, ColIndx, RowIndx, RowIndx + 1, vec.data() + nCol * j, res.data() + nRow * j);
+                            }
+                        }
+
+                        auto time_end_wall = std::chrono::system_clock::now();
+                        auto time_end_cpu = boost::chrono::process_cpu_clock::now();
+                        double duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
+                        double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
+
+                        double duration_mkl = duration_wall;
+
+                        time_begin_wall = std::chrono::system_clock::now();
+                        time_begin_cpu = boost::chrono::process_cpu_clock::now();
+
+                        for (int i = 0; i < testtime; ++i)
+                        {
+                            res += mat * vec;
+                        }
+
+                        time_end_wall = std::chrono::system_clock::now();
+                        time_end_cpu = boost::chrono::process_cpu_clock::now();
+                        duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
+                        duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
+
+                        double duration_eigen = duration_wall;
+
+                        Stat.push_back(Statistic(nRow, nCol, nnz, nstate, testtime, duration_eigen, duration_mkl));
+
+                        std::cout << "nRow = " << nRow << " nCol = " << nCol << " nnz = " << nnz << " nstate = " << nstate << " testtime = " << testtime << std::endl;
+                    }
                 }
-
-                /// run the test
-
-                auto time_begin_wall = std::chrono::system_clock::now();
-                auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
-
-                for (int i = 0; i < testtime; ++i)
-                {
-                    MathUtil::CSRMV(&nRow, &nCol, Value, ColIndx, RowIndx, RowIndx + 1, vec.data(), res.data());
-                }
-
-                auto time_end_wall = std::chrono::system_clock::now();
-                auto time_end_cpu = boost::chrono::process_cpu_clock::now();
-                double duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
-                double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
-
-                double duration_mkl = duration_wall;
-
-                time_begin_wall = std::chrono::system_clock::now();
-                time_begin_cpu = boost::chrono::process_cpu_clock::now();
-
-                for (int i = 0; i < testtime; ++i)
-                {
-                    res += mat * vec;
-                }
-
-                time_end_wall = std::chrono::system_clock::now();
-                time_end_cpu = boost::chrono::process_cpu_clock::now();
-                duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
-                duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
-
-                double duration_eigen = duration_wall;
-
-                Stat.push_back(Statistic(nRow, nCol, nnz, testtime, duration_eigen, duration_mkl));
-
-                std::cout << "nRow = " << nRow << " nCol = " << nCol << " nnz = " << nnz << " testtime = " << testtime << std::endl;
             }
+        }
+
+        /// print the result
+
+        for (auto &stat : Stat)
+        {
+            printf("nRow = %10d nCol = %10d nnz = %10d state = %10d Eigen_time = %10.3f MKL_time = %10.3f Eigen_FLOPS = %10.3f MKL_FLOPS = %10.3f\n",
+                   stat.nRow, stat.nCol, stat.nNnz, stat.nState, stat.Eigen_time, stat.MKL_time, (stat.flops / stat.Eigen_time) / OneGOperation, (stat.flops / stat.MKL_time) / OneGOperation);
         }
     }
 
-    /// print the result
+    Stat.clear();
 
-    for (auto &stat : Stat)
+    for (int state_id = 1; state_id < nSTATE; ++state_id)
     {
-        printf("nRow = %10d nCol = %10d nnz = %10d Eigen_time = %10.3f MKL_time = %10.3f Eigen_FLOPS = %10.3f MKL_FLOPS = %10.3f\n",
-               stat.nRow, stat.nCol, stat.nNnz, stat.Eigen_time, stat.MKL_time, (stat.flops / stat.Eigen_time) / OneGOperation, (stat.flops / stat.MKL_time) / OneGOperation);
+        printf(" ************** state = %d ************** \n", NSTATE[state_id]);
+        Stat.clear();
+        auto nstate = NSTATE[state_id];
+        for (int row_id = 0; row_id < nTASK; row_id++)
+        {
+            for (int col_id = 0; col_id < nTASK; col_id++)
+            {
+                for (int density_id = 0; density_id < nDENSITY; density_id++)
+                {
+
+                    /// generate test data
+
+                    MKL_INT nRow = TASK[row_id];
+                    MKL_INT nCol = TASK[col_id];
+                    double density = DENSITY[density_id];
+
+                    SparseMat_t mat = getSparseMat(nRow, nCol, density);
+
+                    if (nstate == 1)
+                    {
+                        printf("Not supported\n");
+                        exit(1);
+                    }
+                    else
+                    {
+                        Eigen::MatrixXd vec = Eigen::MatrixXd::Random(nCol, nstate);
+                        Eigen::MatrixXd res = Eigen::MatrixXd::Zero(nRow, nstate);
+
+                        /// get the raw ptr to call mkl
+
+                        auto *RowIndx = mat.outerIndexPtr();
+                        auto *ColIndx = mat.innerIndexPtr();
+                        auto *Value = mat.valuePtr();
+                        auto nnz = mat.nonZeros();
+                        auto nFLOPS = nnz * 2.0;
+                        int testtime = (double)OneGOperation / (nFLOPS * FACTOR * nstate);
+
+                        if (testtime < 8)
+                        {
+                            continue;
+                        }
+
+                        /// run the test
+
+                        auto time_begin_wall = std::chrono::system_clock::now();
+                        auto time_begin_cpu = boost::chrono::process_cpu_clock::now();
+
+                        for (int i = 0; i < testtime; ++i)
+                        {
+                            MathUtil::CSRMV(nstate, &nRow, &nCol, Value, ColIndx, RowIndx, RowIndx + 1, vec.data(), res.data());
+                        }
+
+                        auto time_end_wall = std::chrono::system_clock::now();
+                        auto time_end_cpu = boost::chrono::process_cpu_clock::now();
+                        double duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
+                        double duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
+
+                        double duration_mkl = duration_wall;
+
+                        time_begin_wall = std::chrono::system_clock::now();
+                        time_begin_cpu = boost::chrono::process_cpu_clock::now();
+
+                        for (int i = 0; i < testtime; ++i)
+                        {
+                            res += mat * vec;
+                        }
+
+                        time_end_wall = std::chrono::system_clock::now();
+                        time_end_cpu = boost::chrono::process_cpu_clock::now();
+                        duration_wall = get_duration_in_ms(time_begin_wall, time_end_wall) / 1000;
+                        duration_cpu = get_duration_in_ms(time_begin_cpu, time_end_cpu) / 1000;
+
+                        double duration_eigen = duration_wall;
+
+                        Stat.push_back(Statistic(nRow, nCol, nnz, nstate, testtime, duration_eigen, duration_mkl));
+
+                        std::cout << "nRow = " << nRow << " nCol = " << nCol << " nnz = " << nnz << " nstate = " << nstate << " testtime = " << testtime << std::endl;
+                    }
+                }
+            }
+        }
+
+        /// print the result
+
+        for (auto &stat : Stat)
+        {
+            printf("nRow = %10d nCol = %10d nnz = %10d state = %10d Eigen_time = %10.3f MKL_time = %10.3f Eigen_FLOPS = %10.3f MKL_FLOPS = %10.3f\n",
+                   stat.nRow, stat.nCol, stat.nNnz, stat.nState, stat.Eigen_time, stat.MKL_time, (stat.flops / stat.Eigen_time) / OneGOperation, (stat.flops / stat.MKL_time) / OneGOperation);
+        }
     }
 }

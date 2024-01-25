@@ -58,6 +58,12 @@ blas1zdot: blas1-05-zdot.o $(COMMONUTIL_O)
 sblas2dcsrmv: sblas2-01-dcsrmv.o $(COMMONUTIL_O)
 	$(CXX) -std=$(CXX_STANDATD) sblas2-01-dcsrmv.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o sblas2-01-dcsrmv.exe $(LDFALGS)
 
+ptstatemajor: pt-01-state_major.o $(COMMONUTIL_O)
+	$(CXX) -std=$(CXX_STANDATD) pt-01-state_major.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o ptstatemajor.exe $(LDFALGS)
+
+ptCSFmajor: pt-02-CSFMajor.o $(COMMONUTIL_O)
+	$(CXX) -std=$(CXX_STANDATD) pt-02-CSFMajor.o $(COMMONUTIL_O) $(ISPC_O) $(LDFLAGS) $(DEBUGGING) -o ptCSFmajor.exe $(LDFALGS)
+
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
