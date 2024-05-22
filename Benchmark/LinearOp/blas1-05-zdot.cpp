@@ -22,12 +22,12 @@ iCI_complex_double vector_ddot_loop(iCI_complex_double *A, iCI_complex_double *B
 
 size_t _get_loop_time(size_t n)
 {
-    return OneGOperation / (n * FACTOR);
+    return OneGOperation / (2 * n * FACTOR);
 }
 
 double _get_GFLO(size_t n, size_t test_time)
 {
-    return (double(n) * test_time) / OneGOperation;
+    return (2 * double(n) * test_time) / OneGOperation;
 }
 
 int main(int argc, const char **argv)

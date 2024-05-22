@@ -15,13 +15,13 @@ void vector_daxpy_loop(const iCI_complex_double *a, const iCI_complex_double alp
 {
     for (int i = 0; i < size; ++i)
     {
-        b[i] += a[i] * alpha + b[i];
+        b[i] += a[i] * alpha;
     }
 }
 
 size_t _get_loop_time(size_t n)
 {
-    return OneGOperation / (2 * n * FACTOR);
+    return 4 * OneGOperation / (2 * n * FACTOR);
 }
 
 double _get_GFLO(size_t n, size_t test_time)

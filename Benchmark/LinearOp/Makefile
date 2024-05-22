@@ -4,7 +4,7 @@ OPTLEVEL = -O3
 # CXX := icpx
 # OMP = -qopenmp
 # ICPC_OPT_REPORT := -qopt-report -qopt-report-phase=vec 
-EIGEN= /usr/local/include/Eigen
+EIGEN= /usr/include/eigen3
 MKLROOT= /opt/intel/oneapi/mkl/latest
 CXX_WARNING_OPTIONS := -Wall -Wextra -Wno-unused-variable -Wno-unused-function $(ICPC_OPT_REPORT) 
 CBLASROOT := /home/nzhangcaltech/lapack-3.11.0/CBLAS

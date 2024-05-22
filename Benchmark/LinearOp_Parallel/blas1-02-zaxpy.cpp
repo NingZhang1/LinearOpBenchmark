@@ -15,7 +15,7 @@ void vector_zaxpy_loop(const iCI_complex_double *a, const iCI_complex_double alp
 {
     for (int i = 0; i < size; ++i)
     {
-        b[i] += a[i] * alpha + b[i];
+        b[i] += a[i] * alpha;
     }
 }
 
